@@ -1,13 +1,125 @@
-/home/runner/work/ADBServer/ADBServer/n-adb/src/client/usb_linux.cpp:73:18: warning: field 'urb_in' with variable sized type 'usbdevfs_urb' not at the end of a struct or class is a GNU extension [-Wgnu-variable-sized-type-not-at-end]
-   73 |     usbdevfs_urb urb_in;
-      |                  ^
-/home/runner/work/ADBServer/ADBServer/n-adb/src/client/usb_linux.cpp:74:18: warning: field 'urb_out' with variable sized type 'usbdevfs_urb' not at the end of a struct or class is a GNU extension [-Wgnu-variable-sized-type-not-at-end]
-   74 |     usbdevfs_urb urb_out;
-      |                  ^
-3 warnings generated.
-[100%] Linking CXX executable adb
-ld.lld: error: unable to find library -lrt
-clang++: error: linker command failed with exit code 1 (use -v to see invocation)
-make[2]: *** [src/CMakeFiles/adb.dir/build.make:610: src/adb] Error 1
-make[1]: *** [CMakeFiles/Makefile2:441: src/CMakeFiles/adb.dir/all] Error 2
-make: *** [Makefile:91: all] Error 2
+name: Build ADBServer APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-adbserver.yml'
+      - 'ADBServer/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (ADBServer app source)
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Checkout adb source (prife/adb)
+        uses: actions/checkout@v4
+        with:
+          repository: prife/adb
+          path: n-adb
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake make git
+
+      - name: Locate NDK
+        id: ndk
+        run: |
+          # GitHub 的 ubuntu-latest 镜像自带 Android SDK/NDK
+          NDK_PATH="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          if [ -z "$NDK_PATH" ]; then
+            NDK_PATH=$(find /usr/local/lib/android/sdk/ndk -maxdepth 1 -type d | sort -V | tail -n1)
+          fi
+          echo "NDK path: $NDK_PATH"
+          echo "ndk_path=$NDK_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch boringssl (adb's crypto dep)
+        working-directory: n-adb/lib
+        run: |
+          git clone https://salsa.debian.org/android-tools-team/android-platform-external-boringssl.git boringssl
+          cd boringssl
+          git checkout debian/8.1.0+r23-3
+
+      - name: Build boringssl (NDK, android-arm64)
+        working-directory: n-adb/lib/boringssl
+        env:
+          TOOLCHAIN_BIN: ${{ steps.ndk.outputs.ndk_path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
+        run: |
+          # Android 目标的 clang 工具链不认宿主机 LIBRARY_PATH，
+          # 所以直接在命令行整体覆盖 LDFLAGS，去掉这两个 Debian
+          # Makefile 写死的 -lpthread（bionic 没有独立 libpthread，
+          # 符号本来就在 libc 里）。command-line 传入的变量会让
+          # makefile 里对同一变量的 += 全部失效，所以要把 -shared
+          # /-soname 这些原本需要的参数也一起带上，不能只删 -lpthread。
+          make CFLAGS=-fPIC \
+               CC="$TOOLCHAIN_BIN/aarch64-linux-android24-clang" \
+               LDFLAGS="-shared -Wl,-soname,libcrypto.so.0" \
+               -f debian/libcrypto.mk
+          make CXXFLAGS=-fPIC \
+               CXX="$TOOLCHAIN_BIN/aarch64-linux-android24-clang++" \
+               LDFLAGS="-shared -Wl,-soname,libssl.so.0 -Ldebian/out -lcrypto" \
+               -f debian/libssl.mk
+
+      - name: Patch adb's CMakeLists.txt (also hardcodes pthread/rt)
+        run: |
+          # src/CMakeLists.txt 的 LINK_LIBS 列表里写死了 pthread 和 rt，
+          # 这是 CMake target_link_libraries，不是 Makefile 变量，
+          # 没法用命令行覆盖，直接 sed 去掉。
+          #
+          # rt 这条尤其坑：触发条件是 CMAKE_HOST_SYSTEM_NAME MATCHES
+          # "Linux"——判断的是"在什么系统上编译"而不是"编译给什么系统
+          # 用"。我们在 Linux 上交叉编译到 Android，宿主机确实是
+          # Linux，这个分支被误触发，加上了桌面 Linux 才需要的 -lrt
+          # （bionic 没有独立 librt，实时扩展函数早并进 libc 了）。
+          sed -i 's/ pthread)/)/' n-adb/src/CMakeLists.txt
+          sed -i 's/set(LINK_LIBS ${LINK_LIBS} rt)/set(LINK_LIBS ${LINK_LIBS})/' n-adb/src/CMakeLists.txt
+          grep -n "LINK_LIBS" n-adb/src/CMakeLists.txt
+
+      - name: Patch adb_trace.h (drop unused utils/Trace.h include)
+        run: |
+          # adb_trace.h 同时 include 了 cutils/trace.h 和 utils/Trace.h，
+          # 但 adb 源码里实际只用了 cutils/trace.h 提供的 ATRACE_* 宏
+          # （已完整 vendor 在仓库里，自包含）。utils/Trace.h 是
+          # AOSP libutils 里那个没人用的 android::Tracer 类，它会一路
+          # include 到 system/graphics.h，而这个头文件 prife/adb 压根
+          # 没有 vendor 进来，所以直接删掉这行没用的 include。
+          sed -i '/#include <utils\/Trace.h>/d' n-adb/src/adb_trace.h
+          grep -n "trace.h\|Trace.h" n-adb/src/adb_trace.h
+
+      - name: Configure & build adb (NDK, android-arm64)
+        working-directory: n-adb
+        run: |
+          mkdir build-android
+          cd build-android
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.ndk.outputs.ndk_path }}/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-30 \
+            -DCMAKE_C_FLAGS="-D_FORTIFY_SOURCE=0" \
+            -DCMAKE_CXX_FLAGS="-D_FORTIFY_SOURCE=0"
+          make -j"$(nproc)"
+
+      - name: Locate built adb binary and rename for jniLibs
+        run: |
+          BIN=$(find n-adb/build-android -maxdepth 1 -type f -executable -iname 'adb*' | head -n1)
+          echo "found: $BIN"
+          file "$BIN"
+          mkdir -p repo/ADBServer/app/src/main/jniLibs/arm64-v8a
+          cp "$BIN" repo/ADBServer/app/src/main/jniLibs/arm64-v8a/libadb.so
+
+      - name: Assemble debug APK
+        working-directory: repo/ADBServer
+        run: |
+          gradle assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ADBServer-debug-apk
+          path: repo/ADBServer/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
