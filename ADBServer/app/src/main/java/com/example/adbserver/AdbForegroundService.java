@@ -1,109 +1,195 @@
-package com.example.adbserver;
+importClass(android.app.ActivityOptions)
+importClass(android.content.Intent)
+importClass(android.graphics.Rect)
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.Service;
-import android.content.Intent;
-import android.os.Build;
-import android.os.IBinder;
+const CONFIG = [
+    {
+        'name': 'com.netease.sky.bilibili',
+        'activity': 'com.tgc.sky.netease.GameActivity_Netease',
+        'left': 100,
+        'top': 10,
+        'width': 890,
+        'height': 600,
+        'offset_x': 0,
+        'offset_y': 0,
+    },
+    {
+        'name': 'com.netease.sky.huawei',
+        'activity': 'com.tgc.sky.netease.GameActivity_Netease',
+        'left': 100,
+        'top': 750,
+        'width': 890,
+        'height': 600,
+        'offset_x': -50,
+        'offset_y': -100,
+    }
+]
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.InputStreamReader;
+function runADBShell(cmd) {
+    var Array = java.lang.reflect.Array
+    var args = ["shell", cmd]
+    var strArray = Array.newInstance(java.lang.String, args.length)
+    for (var i = 0; i < args.length; i++) {
+        Array.set(strArray, i, args[i])
+    }
+    var intent = new Intent()
+    intent.setClassName("com.termux", "com.termux.app.RunCommandService")
+    intent.setAction("com.termux.RUN_COMMAND")
+    intent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/adb")
+    intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", strArray)
+    intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
+    context.startForegroundService(intent)
+}
 
-public class AdbForegroundService extends Service {
+function launchFreeformADB(pkg, activity, left, top, right, bottom) {
+    var cmd =
+        "am start -n " + pkg + "/" + activity + " --windowingMode 5;" +
+        " sleep 1.5;" +
+        " TID=$(dumpsys activity activities | grep -A 3 '" + pkg + "' | grep -oE 'taskId=[0-9]+' | head -1 | cut -d= -f2);" +
+        " am task resize $TID " + left + " " + top + " " + right + " " + bottom
+    runADBShell(cmd)
+}
 
-    private static final String CHANNEL_ID = "adbserver_channel";
-    // 广播 Intent extra 有大小限制（binder 事务约 1MB，实际建议远小于此），
-    // 超过这个长度就只广播文件路径，由接收方自己去读文件。
-    private static final int INLINE_RESULT_LIMIT = 4000;
+function stopAppADB(pkg) {
+    runADBShell("am force-stop " + pkg)
+}
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        startForegroundCompat();
+function launchFreeform(pkg, activity, left, top, right, bottom) {
+    var options = ActivityOptions.makeBasic();
+    try {
+        var m = ActivityOptions.class.getMethod("setLaunchWindowingMode", java.lang.Integer.TYPE)
+        m.invoke(options, java.lang.Integer.valueOf(5)) // WINDOWING_MODE_FREEFORM = 5
+        options.setLaunchWindowingMode(5)
+    } catch (e) {
+        log("setLaunchWindowingMode failed:" + e)
+    }
 
-        String cmd = intent != null ? intent.getStringExtra("cmd") : null;
-        if (cmd != null) {
-            new Thread(() -> runAdbAndReport(cmd)).start();
-        } else {
-            stopSelf();
+    options.setLaunchBounds(new Rect(left, top, right, bottom))
+
+    var intent = new Intent()
+    intent.setClassName(pkg, activity)
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+
+    context.startActivity(intent, options.toBundle())
+}
+
+function stopApp(pkg) {
+    var intent = new Intent();
+
+    var Array = java.lang.reflect.Array
+    var args =  ["shell", "am", "force-stop", pkg]
+
+    var strArray = Array.newInstance(java.lang.String, args.length)
+    for (var i = 0; i < args.length; i++) {
+        Array.set(strArray, i, args[i])
+    }
+    
+    intent.setClassName("com.termux", "com.termux.app.RunCommandService")
+    intent.setAction("com.termux.RUN_COMMAND")
+    intent.putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/adb")
+    intent.putExtra(
+        "com.termux.RUN_COMMAND_ARGUMENTS",
+        strArray
+    )
+    intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+    context.startForegroundService(intent);
+}
+
+function closeApp(left, top, close) {
+    sleep(100)
+    click(left + 835, top + close)
+}
+
+function startGame(left, top) {
+    sleep(100)
+    click(left + 690, top + 300)
+}
+
+function continueAdventure(left, top) {
+    sleep(100)
+    gestures([800, [left + 200, top + 480], [left + 200, top + 320]])
+    sleep(200)
+    gestures([800, [left + 200, top + 480], [left + 200, top + 320]])
+    sleep(200)
+    gestures([800, [left + 200, top + 480], [left + 200, top + 320]])
+    sleep(1000)
+    click(left + 290, top + 440)
+    sleep(1000)
+    click(left + 580, top + 480)
+    sleep(1000)
+    click(left + 580, top + 480)
+    sleep(1000)
+}
+
+function moveToTarget(left, top) {
+    sleep(100)
+    // click(left + 590, top + 410)
+    gestures([800, [left + 200, top + 480], [left + 200, top + 320]])
+    sleep(400)
+    
+    sleep(1000)
+    gestures([800, [left + 730, top + 350], [left + 600, top + 350]])
+    
+    for (let i = 0; i < 11; i ++) {
+        sleep(500)
+        gestures([800, [left + 200, top + 480], [left + 200, top + 320]])
+    }
+    
+    sleep(500)
+    gestures([800, [left + 730, top + 350], [left + 510, top + 350]])
+    
+    for (let i = 0; i < 4; i ++) {
+        sleep(500)
+        gestures([800, [left + 100, top + 480], [left + 100, top + 320]])
+    }
+
+    //sleep(500)
+    //gestures([800, [left + 730, top + 350], [left + 550, top + 350]])
+    
+    //sleep(100)
+    //click(left + 590, top + 410)
+}
+
+function skipAD(configs) {
+    for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < configs.length; j++) {
+            launchFreeformADB(
+                configs[j]['name'],
+                configs[j]['activity'],
+                configs[j]['left'],
+                configs[j]['top'],
+                configs[j]['left'] + configs[j]['width'],
+                configs[j]['top'] + configs[j]['height']
+            )
+            sleep(400)
         }
-        return START_NOT_STICKY;
-    }
-
-    private void startForegroundCompat() {
-        if (Build.VERSION.SDK_INT >= 26) {
-            NotificationManager nm = getSystemService(NotificationManager.class);
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "ADB Server", NotificationManager.IMPORTANCE_MIN);
-            nm.createNotificationChannel(channel);
-
-            Notification notification = new Notification.Builder(this, CHANNEL_ID)
-                    .setContentTitle("ADBServer")
-                    .setContentText("Running adb command...")
-                    .setSmallIcon(android.R.drawable.stat_sys_download)
-                    .build();
-            startForeground(1, notification);
+        sleep(20 * 1000)
+        
+        for (let j = 0; j < configs.length; j++) {
+            stopAppADB(configs[j]['name'])
+            sleep(400)
         }
+        sleep(3000)
     }
+}
 
-    private void runAdbAndReport(String cmdArgs) {
-        String adbPath = getApplicationInfo().nativeLibraryDir + "/libadb.so";
-        StringBuilder output = new StringBuilder();
+function startSingleGame(config) {
+    launchFreeform(config['name'], config['activity'], config['left'], config['top'], config['left'] + config['width'], config['top'] + config['height'])
+    sleep(20 * 1000)
 
-        try {
-            String[] parts = cmdArgs.trim().split("\\s+");
-            String[] fullCmd = new String[parts.length + 1];
-            fullCmd[0] = adbPath;
-            System.arraycopy(parts, 0, fullCmd, 1, parts.length);
+    startGame(config['left'] + config['offset_x'], config['top'] + config['offset_y'])
+    sleep(35 * 1000)
+    continueAdventure(config['left'] + config['offset_x'], config['top'] + config['offset_y'])
+    sleep(10 * 1000)
+    moveToTarget(config['left'] + config['offset_x'], config['top'] + config['offset_y'])
+}
 
-            ProcessBuilder pb = new ProcessBuilder(fullCmd);
-            pb.redirectErrorStream(true);
-            pb.environment().put("HOME", getFilesDir().getAbsolutePath());
-            // adb 需要一个可写目录存放 adbkey（RSA 认证密钥对），
-            // 默认会去 $HOME/.android/，指向 App 私有目录避免权限问题。
+//skipAD(CONFIG)
+startSingleGame(CONFIG[1])
 
-            Process process = pb.start();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-            process.waitFor();
-        } catch (Exception e) {
-            output.append("ERROR: ").append(e.getClass().getSimpleName())
-                    .append(": ").append(e.getMessage());
-        }
+//sleep(20 * 1000)
 
-        String result = output.toString();
-        File resultFile = writeResultFile(result);
-        broadcastResult(result, resultFile);
-        stopSelf();
-    }
-
-    private File writeResultFile(String result) {
-        File f = new File(getFilesDir(), "adb_result.txt");
-        try (FileWriter fw = new FileWriter(f)) {
-            fw.write(result);
-        } catch (Exception ignored) {
-        }
-        return f;
-    }
-
-    private void broadcastResult(String result, File resultFile) {
-        Intent resultIntent = new Intent("com.example.adbserver.RESULT");
-        if (result.length() < INLINE_RESULT_LIMIT) {
-            resultIntent.putExtra("result", result);
-        } else {
-            resultIntent.putExtra("result_file", resultFile.getAbsolutePath());
-        }
-        sendBroadcast(resultIntent);
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
+for (let i = 5; i < CONFIG.length; i++) {
+    startSingleGame(CONFIG[i])
+    sleep(1000)
 }
