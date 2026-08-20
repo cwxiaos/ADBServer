@@ -56,12 +56,15 @@ jobs:
           # 符号本来就在 libc 里）。command-line 传入的变量会让
           # makefile 里对同一变量的 += 全部失效，所以要把 -shared
           # /-soname 这些原本需要的参数也一起带上，不能只删 -lpthread。
-          make CFLAGS=-fPIC \
+          # ghashv8-armx64.S / aesv8-armx64.S 这些文件用了 pmull/aes
+          # 这类 ARMv8 Crypto Extension 指令，默认的通用 aarch64 目标
+          # 没开这个扩展，加 -march 显式打开。
+          make CFLAGS="-fPIC -march=armv8-a+crypto" \
                CC="$TOOLCHAIN_BIN/aarch64-linux-android24-clang" \
                DEB_HOST_ARCH=arm64 \
                LDFLAGS="-shared -Wl,-soname,libcrypto.so.0" \
                -f debian/libcrypto.mk
-          make CXXFLAGS=-fPIC \
+          make CXXFLAGS="-fPIC -march=armv8-a+crypto" \
                CXX="$TOOLCHAIN_BIN/aarch64-linux-android24-clang++" \
                DEB_HOST_ARCH=arm64 \
                LDFLAGS="-shared -Wl,-soname,libssl.so.0 -Ldebian/out -lcrypto" \
