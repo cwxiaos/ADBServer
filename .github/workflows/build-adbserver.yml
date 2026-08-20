@@ -38,17 +38,6 @@ jobs:
           echo "NDK path: $NDK_PATH"
           echo "ndk_path=$NDK_PATH" >> "$GITHUB_OUTPUT"
 
-      - name: Stub out -lpthread (bionic has no separate libpthread)
-        run: |
-          # boringssl 的 debian Makefile 和 prife/adb 自己的
-          # src/CMakeLists.txt 都写死了 -lpthread（给 glibc 用的），
-          # 但 Android bionic 早就把 pthread 并进了 libc，没有独立的库。
-          # 做一个空归档骗过链接器的存在性检查，反正符号本来就在 libc 里。
-          mkdir -p stub-libs
-          ${{ steps.ndk.outputs.ndk_path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar \
-            crs stub-libs/libpthread.a
-          echo "LIBRARY_PATH=$PWD/stub-libs" >> "$GITHUB_ENV"
-
       - name: Fetch boringssl (adb's crypto dep)
         working-directory: n-adb/lib
         run: |
@@ -61,8 +50,28 @@ jobs:
         env:
           TOOLCHAIN_BIN: ${{ steps.ndk.outputs.ndk_path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
         run: |
-          make CFLAGS=-fPIC CC="$TOOLCHAIN_BIN/aarch64-linux-android24-clang" -f debian/libcrypto.mk
-          make CXXFLAGS=-fPIC CXX="$TOOLCHAIN_BIN/aarch64-linux-android24-clang++" -f debian/libssl.mk
+          # Android 目标的 clang 工具链不认宿主机 LIBRARY_PATH，
+          # 所以直接在命令行整体覆盖 LDFLAGS，去掉这两个 Debian
+          # Makefile 写死的 -lpthread（bionic 没有独立 libpthread，
+          # 符号本来就在 libc 里）。command-line 传入的变量会让
+          # makefile 里对同一变量的 += 全部失效，所以要把 -shared
+          # /-soname 这些原本需要的参数也一起带上，不能只删 -lpthread。
+          make CFLAGS=-fPIC \
+               CC="$TOOLCHAIN_BIN/aarch64-linux-android24-clang" \
+               LDFLAGS="-shared -Wl,-soname,libcrypto.so.0" \
+               -f debian/libcrypto.mk
+          make CXXFLAGS=-fPIC \
+               CXX="$TOOLCHAIN_BIN/aarch64-linux-android24-clang++" \
+               LDFLAGS="-shared -Wl,-soname,libssl.so.0 -Ldebian/out -lcrypto" \
+               -f debian/libssl.mk
+
+      - name: Patch adb's CMakeLists.txt (also hardcodes pthread)
+        run: |
+          # src/CMakeLists.txt 的 LINK_LIBS 列表里也写死了 pthread，
+          # 这是 CMake target_link_libraries，不是 Makefile 变量，
+          # 没法用命令行覆盖，直接 sed 去掉这一项。
+          sed -i 's/ pthread)/)/' n-adb/src/CMakeLists.txt
+          grep LINK_LIBS n-adb/src/CMakeLists.txt
 
       - name: Configure & build adb (NDK, android-arm64)
         working-directory: n-adb
