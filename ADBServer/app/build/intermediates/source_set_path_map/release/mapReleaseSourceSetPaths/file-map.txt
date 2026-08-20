@@ -1,0 +1,7 @@
+com.example.adbserver.app-pngs-0 /Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/build/generated/res/pngs/release
+com.example.adbserver.app-resValues-1 /Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/build/generated/res/resValues/release
+com.example.adbserver.app-packageReleaseResources-2 /Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/build/intermediates/incremental/release/packageReleaseResources/merged.dir
+com.example.adbserver.app-packageReleaseResources-3 /Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/build/intermediates/incremental/release/packageReleaseResources/stripped.dir
+com.example.adbserver.app-release-4 /Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/build/intermediates/merged_res/release/mergeReleaseResources
+com.example.adbserver.app-main-5 /Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/res
+com.example.adbserver.app-release-6 /Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/release/res

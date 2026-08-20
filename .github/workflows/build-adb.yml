@@ -2,9 +2,9 @@ name: Build adb binary only (no APK)
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/build-adb-binary.yml'
+  # push:
+  #   paths:
+  #     - '.github/workflows/build-adb-binary.yml'
 
 jobs:
   build:

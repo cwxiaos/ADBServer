@@ -1,0 +1,81 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.example.adbserver"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="30"
+9        android:targetSdkVersion="30" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:4:5-67
+11-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:4:22-64
+12    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+12-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:5:5-77
+12-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:5:22-74
+13    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+13-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:6:5-87
+13-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:6:22-84
+14    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+14-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:7:5-77
+14-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:7:22-74
+15
+16    <application
+16-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:9:5-42:19
+17        android:allowBackup="false"
+17-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:10:9-36
+18        android:extractNativeLibs="true"
+18-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:11:9-41
+19        android:icon="@android:drawable/sym_def_app_icon"
+19-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:12:9-58
+20        android:label="ADBServer" >
+20-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:13:9-34
+21        <activity
+21-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:15:9-22:20
+22            android:name="com.example.adbserver.MainActivity"
+22-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:16:13-41
+23            android:exported="true" >
+23-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:17:13-36
+24            <intent-filter>
+24-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:18:13-21:29
+25                <action android:name="android.intent.action.MAIN" />
+25-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:19:17-69
+25-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:19:25-66
+26
+27                <category android:name="android.intent.category.LAUNCHER" />
+27-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:20:17-77
+27-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:20:27-74
+28            </intent-filter>
+29        </activity>
+30
+31        <!--
+32          exported="true" 是为了能接收 AutoJs6（另一个 App）发出的广播。
+33          注意：这意味着任何知道 action 名称的 App 理论上都能给它发命令，
+34          生产环境建议加自定义 permission 或校验发送方包名，见下方 Java 代码注释。
+35        -->
+36        <receiver
+36-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:29:9-35:20
+37            android:name="com.example.adbserver.AdbBroadcastReceiver"
+37-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:30:13-49
+38            android:exported="true" >
+38-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:31:13-36
+39            <intent-filter>
+39-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:32:13-34:29
+40                <action android:name="com.example.adbserver.RUN_COMMAND" />
+40-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:33:17-76
+40-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:33:25-73
+41            </intent-filter>
+42        </receiver>
+43
+44        <service
+44-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:37:9-40:56
+45            android:name="com.example.adbserver.AdbForegroundService"
+45-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:38:13-49
+46            android:exported="false"
+46-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:39:13-37
+47            android:foregroundServiceType="dataSync" />
+47-->/Users/cwxiaos/Documents/Android/ADBServer/ADBServer/app/src/main/AndroidManifest.xml:40:13-53
+48    </application>
+49
+50</manifest>

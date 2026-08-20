@@ -2,10 +2,10 @@ name: Build ADBServer APK
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/build-adbserver.yml'
-      - 'ADBServer/**'
+  # push:
+  #   paths:
+  #     - '.github/workflows/build-adbserver.yml'
+  #     - 'ADBServer/**'
 
 jobs:
   build:
