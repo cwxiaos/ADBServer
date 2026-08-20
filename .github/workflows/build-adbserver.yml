@@ -58,10 +58,12 @@ jobs:
           # /-soname 这些原本需要的参数也一起带上，不能只删 -lpthread。
           make CFLAGS=-fPIC \
                CC="$TOOLCHAIN_BIN/aarch64-linux-android24-clang" \
+               DEB_HOST_ARCH=arm64 \
                LDFLAGS="-shared -Wl,-soname,libcrypto.so.0" \
                -f debian/libcrypto.mk
           make CXXFLAGS=-fPIC \
                CXX="$TOOLCHAIN_BIN/aarch64-linux-android24-clang++" \
+               DEB_HOST_ARCH=arm64 \
                LDFLAGS="-shared -Wl,-soname,libssl.so.0 -Ldebian/out -lcrypto" \
                -f debian/libssl.mk
 
