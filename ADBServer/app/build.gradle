@@ -1,0 +1,35 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.example.adbserver'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.adbserver"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    // 关键：确保 libadb.so 以未压缩形式打进 APK，
+    // 这样系统才会把它真正解压到 nativeLibraryDir（可执行目录），
+    // 而不是留在压缩的 APK zip 里直接 mmap（那样没法当外部进程 exec）。
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+}
