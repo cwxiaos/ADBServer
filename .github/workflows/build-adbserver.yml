@@ -73,6 +73,17 @@ jobs:
           sed -i 's/ pthread)/)/' n-adb/src/CMakeLists.txt
           grep LINK_LIBS n-adb/src/CMakeLists.txt
 
+      - name: Patch adb_trace.h (drop unused utils/Trace.h include)
+        run: |
+          # adb_trace.h 同时 include 了 cutils/trace.h 和 utils/Trace.h，
+          # 但 adb 源码里实际只用了 cutils/trace.h 提供的 ATRACE_* 宏
+          # （已完整 vendor 在仓库里，自包含）。utils/Trace.h 是
+          # AOSP libutils 里那个没人用的 android::Tracer 类，它会一路
+          # include 到 system/graphics.h，而这个头文件 prife/adb 压根
+          # 没有 vendor 进来，所以直接删掉这行没用的 include。
+          sed -i '/#include <utils\/Trace.h>/d' n-adb/src/adb_trace.h
+          grep -n "trace.h\|Trace.h" n-adb/src/adb_trace.h
+
       - name: Configure & build adb (NDK, android-arm64)
         working-directory: n-adb
         run: |
