@@ -65,10 +65,6 @@ public class AdbForegroundService extends Service {
             // adb 需要一个可写目录存放 adbkey（RSA 认证密钥对），
             // 默认会去 $HOME/.android/，指向 App 私有目录避免权限问题。
 
-            pb.environment().put("LD_LIBRARY_PATH", getApplicationInfo().nativeLibraryDir);
-            // adb 动态链接了随包一起塞进 nativeLibraryDir 的 libcrypto.so.0，
-            // 运行时得告诉动态链接器去这个目录找。
-
             Process process = pb.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;

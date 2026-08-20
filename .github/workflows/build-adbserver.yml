@@ -45,30 +45,48 @@ jobs:
           cd boringssl
           git checkout debian/8.1.0+r23-3
 
-      - name: Build boringssl (NDK, android-arm64)
+      - name: Build boringssl (NDK, android-arm64, static archive)
         working-directory: n-adb/lib/boringssl
         env:
           TOOLCHAIN_BIN: ${{ steps.ndk.outputs.ndk_path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
         run: |
-          # Android 目标的 clang 工具链不认宿主机 LIBRARY_PATH，
-          # 所以直接在命令行整体覆盖 LDFLAGS，去掉这两个 Debian
-          # Makefile 写死的 -lpthread（bionic 没有独立 libpthread，
-          # 符号本来就在 libc 里）。command-line 传入的变量会让
-          # makefile 里对同一变量的 += 全部失效，所以要把 -shared
-          # /-soname 这些原本需要的参数也一起带上，不能只删 -lpthread。
-          # ghashv8-armx64.S / aesv8-armx64.S 这些文件用了 pmull/aes
-          # 这类 ARMv8 Crypto Extension 指令，默认的通用 aarch64 目标
-          # 没开这个扩展，加 -march 显式打开。
-          make CFLAGS="-fPIC -march=armv8-a+crypto" \
-               CC="$TOOLCHAIN_BIN/aarch64-linux-android24-clang" \
-               DEB_HOST_ARCH=arm64 \
-               LDFLAGS="-shared -Wl,-soname,libcrypto.so.0" \
-               -f debian/libcrypto.mk
-          make CXXFLAGS="-fPIC -march=armv8-a+crypto" \
-               CXX="$TOOLCHAIN_BIN/aarch64-linux-android24-clang++" \
-               DEB_HOST_ARCH=arm64 \
-               LDFLAGS="-shared -Wl,-soname,libssl.so.0 -Ldebian/out -lcrypto" \
-               -f debian/libssl.mk
+          # 预生成的 ARM64 汇编文件（sha256-armv8.S 等）访问
+          # OPENSSL_armcap_P 用的重定位类型（R_AARCH64_PREL64）不满足
+          # 共享库（.so）要求的 GOT 间接寻址，链接成 .so 会直接报错。
+          # 改成编译成静态归档（.a），静态链接进最终的 adb 可执行文件，
+          # 没有 DSO 边界，这类重定位完全合法，问题不复存在。
+          #
+          # 用 $(info) 让 make 把展开好的 SOURCES 变量打印出来，
+          # 而不是去改 Makefile 的 recipe——Make 对 recipe 的 tab
+          # 缩进极其敏感，在 workflow yaml 里手写 heredoc 很容易踩坑，
+          # 直接用 bash 循环编译更稳。
+          CC="$TOOLCHAIN_BIN/aarch64-linux-android24-clang"
+          CXX="$TOOLCHAIN_BIN/aarch64-linux-android24-clang++"
+          AR="$TOOLCHAIN_BIN/llvm-ar"
+          CFLAGS="-fPIC -march=armv8-a+crypto -D_XOPEN_SOURCE=700 -DBORINGSSL_ANDROID_SYSTEM -DBORINGSSL_IMPLEMENTATION -DBORINGSSL_SHARED_LIBRARY -DOPENSSL_SMALL -fvisibility=hidden -Wa,--noexecstack"
+
+          mkdir -p debian/out debian/objs
+
+          echo '$(info SOURCES_LIST:$(SOURCES))' >> debian/libcrypto.mk
+          CRYPTO_SOURCES=$(make -f debian/libcrypto.mk DEB_HOST_ARCH=arm64 print-nothing 2>&1 \
+              | grep '^SOURCES_LIST:' | sed 's/^SOURCES_LIST://')
+          for f in $CRYPTO_SOURCES; do
+            obj="debian/objs/$(echo "$f" | tr '/' '_').o"
+            "$CC" $CFLAGS -Isrc/include -Isrc/crypto -c "$f" -o "$obj"
+          done
+          "$AR" rcs debian/out/libcrypto.a debian/objs/*.o
+          rm -f debian/objs/*.o
+
+          echo '$(info SOURCES_LIST:$(SOURCES))' >> debian/libssl.mk
+          SSL_SOURCES=$(make -f debian/libssl.mk DEB_HOST_ARCH=arm64 print-nothing 2>&1 \
+              | grep '^SOURCES_LIST:' | sed 's/^SOURCES_LIST://')
+          for f in $SSL_SOURCES; do
+            obj="debian/objs/$(echo "$f" | tr '/' '_').o"
+            "$CXX" $CFLAGS -Isrc/include -c "$f" -o "$obj"
+          done
+          "$AR" rcs debian/out/libssl.a debian/objs/*.o
+
+          ls -la debian/out/
 
       - name: Patch adb's CMakeLists.txt (also hardcodes pthread/rt, and a bad prebuilt libcrypto)
         run: |
@@ -125,11 +143,6 @@ jobs:
           file "$BIN"
           mkdir -p repo/ADBServer/app/src/main/jniLibs/arm64-v8a
           cp "$BIN" repo/ADBServer/app/src/main/jniLibs/arm64-v8a/libadb.so
-
-          # adb 动态链接了我们自己编译的 libcrypto.so.0，运行时也得
-          # 一起塞进 nativeLibraryDir 才能找到，跟 libadb.so 放同一目录。
-          cp n-adb/lib/boringssl/debian/out/libcrypto.so.0 \
-             repo/ADBServer/app/src/main/jniLibs/arm64-v8a/libcrypto.so.0
           ls -la repo/ADBServer/app/src/main/jniLibs/arm64-v8a/
 
       - name: Assemble debug APK
