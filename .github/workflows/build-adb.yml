@@ -1,21 +1,15 @@
-name: Build ADBServer ADB
+name: Build adb binary only (no APK)
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - '.github/workflows/build-adbserver.yml'
-      - 'ADBServer/**'
+      - '.github/workflows/build-adb-binary.yml'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout this repo (ADBServer app source)
-        uses: actions/checkout@v4
-        with:
-          path: repo
-
       - name: Checkout adb source (prife/adb)
         uses: actions/checkout@v4
         with:
@@ -140,23 +134,18 @@ jobs:
             -DCMAKE_CXX_FLAGS="-D_FORTIFY_SOURCE=0"
           make -j"$(nproc)"
 
-      - name: Locate built adb binary and rename for jniLibs
+      - name: Locate built adb binary
         run: |
           BIN=$(find n-adb/build-android -type f -executable -iname 'adb' | head -n1)
           echo "found: $BIN"
           file "$BIN"
-          mkdir -p repo/ADBServer/app/src/main/jniLibs/arm64-v8a
-          cp "$BIN" repo/ADBServer/app/src/main/jniLibs/arm64-v8a/libadb.so
-          ls -la repo/ADBServer/app/src/main/jniLibs/arm64-v8a/
+          mkdir -p out
+          cp "$BIN" out/adb-android-arm64
+          ls -la out/
 
-      - name: Assemble debug APK
-        working-directory: repo/ADBServer
-        run: |
-          gradle assembleDebug --no-daemon
-
-      - name: Upload APK artifact
+      - name: Upload adb binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ADBServer-debug-apk
-          path: repo/ADBServer/app/build/outputs/apk/debug/app-debug.apk
+          name: adb-android-arm64
+          path: out/adb-android-arm64
           if-no-files-found: error
