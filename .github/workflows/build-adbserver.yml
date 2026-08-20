@@ -38,6 +38,17 @@ jobs:
           echo "NDK path: $NDK_PATH"
           echo "ndk_path=$NDK_PATH" >> "$GITHUB_OUTPUT"
 
+      - name: Stub out -lpthread (bionic has no separate libpthread)
+        run: |
+          # boringssl 的 debian Makefile 和 prife/adb 自己的
+          # src/CMakeLists.txt 都写死了 -lpthread（给 glibc 用的），
+          # 但 Android bionic 早就把 pthread 并进了 libc，没有独立的库。
+          # 做一个空归档骗过链接器的存在性检查，反正符号本来就在 libc 里。
+          mkdir -p stub-libs
+          ${{ steps.ndk.outputs.ndk_path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar \
+            crs stub-libs/libpthread.a
+          echo "LIBRARY_PATH=$PWD/stub-libs" >> "$GITHUB_ENV"
+
       - name: Fetch boringssl (adb's crypto dep)
         working-directory: n-adb/lib
         run: |
