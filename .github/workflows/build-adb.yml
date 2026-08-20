@@ -1,4 +1,4 @@
-name: Build ADBServer APK
+name: Build ADBServer ADB
 
 on:
   workflow_dispatch:
