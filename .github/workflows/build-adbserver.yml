@@ -67,9 +67,11 @@ jobs:
 
           mkdir -p debian/out debian/objs
 
+          echo '' >> debian/libcrypto.mk
           echo '$(info SOURCES_LIST:$(SOURCES))' >> debian/libcrypto.mk
           CRYPTO_SOURCES=$(make -f debian/libcrypto.mk DEB_HOST_ARCH=arm64 print-nothing 2>&1 \
               | grep '^SOURCES_LIST:' | sed 's/^SOURCES_LIST://')
+          echo "crypto source count: $(echo $CRYPTO_SOURCES | wc -w)"
           for f in $CRYPTO_SOURCES; do
             obj="debian/objs/$(echo "$f" | tr '/' '_').o"
             "$CC" $CFLAGS -Isrc/include -Isrc/crypto -c "$f" -o "$obj"
@@ -77,9 +79,11 @@ jobs:
           "$AR" rcs debian/out/libcrypto.a debian/objs/*.o
           rm -f debian/objs/*.o
 
+          echo '' >> debian/libssl.mk
           echo '$(info SOURCES_LIST:$(SOURCES))' >> debian/libssl.mk
           SSL_SOURCES=$(make -f debian/libssl.mk DEB_HOST_ARCH=arm64 print-nothing 2>&1 \
               | grep '^SOURCES_LIST:' | sed 's/^SOURCES_LIST://')
+          echo "ssl source count: $(echo $SSL_SOURCES | wc -w)"
           for f in $SSL_SOURCES; do
             obj="debian/objs/$(echo "$f" | tr '/' '_').o"
             "$CXX" $CFLAGS -Isrc/include -c "$f" -o "$obj"
